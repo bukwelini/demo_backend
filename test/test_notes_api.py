@@ -1,3 +1,6 @@
+from app import create_app
+
+
 def test_list_notes_empty(client):
     response = client.get("/api/notes")
 
@@ -86,8 +89,25 @@ def test_field_length_validation(client):
     assert content_response.get_json()["error"] == "Note must be 1000 characters or fewer."
 
 
-def test_frontend_index_is_served(client):
-    response = client.get("/")
+def test_frontend_index_is_served_when_available(tmp_path):
+    frontend_dir = tmp_path / "frontend"
+    frontend_dir.mkdir()
+    (frontend_dir / "index.html").write_text("<title>Mini Notes</title>", encoding="utf-8")
+
+    configured_app = create_app(
+        {
+            "TESTING": True,
+            "DATABASE": tmp_path / "frontend.db",
+            "FRONTEND_DIR": str(frontend_dir),
+            "SERVE_FRONTEND": True,
+        }
+    )
+    response = configured_app.test_client().get("/")
 
     assert response.status_code == 200
     assert b"Mini Notes" in response.data
+
+
+def test_api_works_without_frontend(client):
+    assert client.get("/").status_code == 404
+    assert client.get("/api/notes").status_code == 200
